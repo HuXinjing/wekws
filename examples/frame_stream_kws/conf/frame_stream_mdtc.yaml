@@ -1,0 +1,73 @@
+# 帧流式关键词检测 - MDTC Backbone配置
+# Frame Streaming KWS - MDTC Backbone Configuration
+#
+# 使用MDTC (Multi-scale Depthwise Temporal Convolution) 作为backbone
+# MDTC是另一种支持流式推理的架构
+
+dataset_conf:
+    filter_conf:
+        max_length: 2048
+        min_length: 0
+    
+    resample_conf:
+        resample_rate: 16000
+    
+    speed_perturb: false
+    
+    # 特征提取
+    feats_type: 'fbank'
+    feature_extraction_conf:
+        feature_type: 'fbank'
+        num_mel_bins: 80
+        frame_shift: 10
+        frame_length: 25
+        dither: 1.0
+    
+    # 注意：MDTC通常不需要context_expansion
+    # 但如果推理时使用了，这里也需要配置
+    context_expansion: false
+    
+    frame_skip: 1            # MDTC通常不需要frame_skip
+    
+    spec_aug: true
+    spec_aug_conf:
+        num_t_mask: 1
+        num_f_mask: 1
+        max_t: 20
+        max_f: 10
+    
+    shuffle: true
+    shuffle_conf:
+        shuffle_size: 1500
+    
+    batch_conf:
+        batch_size: 128      # MDTC可能需要较小的batch size
+
+model:
+    input_dim: 80            # 无context_expansion时使用原始特征维度
+    hidden_dim: 64
+    preprocessing:
+        type: linear         # MDTC通常需要线性投影
+    backbone:
+        type: mdtc           # 使用MDTC backbone
+        num_stack: 4         # MDTC堆叠数量
+        stack_size: 4        # 每个堆叠的大小
+        kernel_size: 5       # 卷积核大小
+        hidden_dim: 64       # 隐藏层维度
+        causal: True         # 因果卷积（流式必需）
+    classifier:
+        type: identity       # CTC使用identity
+    activation:
+        type: identity
+
+optim: adam
+optim_conf:
+    lr: 0.001
+    weight_decay: 0.00005
+
+training_config:
+    grad_clip: 5
+    max_epoch: 100
+    log_interval: 10
+    criterion: ctc
+

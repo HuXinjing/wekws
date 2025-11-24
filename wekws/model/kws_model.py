@@ -28,6 +28,8 @@ from wekws.model.tcn import TCN, CnnBlock, DsCnnBlock
 from wekws.model.mdtc import MDTC
 from wekws.utils.cmvn import load_cmvn, load_kaldi_cmvn
 from wekws.model.fsmn import FSMN
+from wekws.model.lstm import LSTM
+from wekws.model.transformer import StreamingTransformer
 
 
 class KWSModel(nn.Module):
@@ -131,6 +133,31 @@ def init_model(configs):
                                 hidden_dim,
                                 num_layers=num_layers,
                                 batch_first=True)
+    elif backbone_type == 'lstm':
+        num_layers = configs['backbone']['num_layers']
+        dropout = configs['backbone'].get('dropout', 0.0)
+        bidirectional = configs['backbone'].get('bidirectional', False)
+        backbone = LSTM(hidden_dim,
+                       hidden_dim,
+                       num_layers=num_layers,
+                       dropout=dropout,
+                       bidirectional=bidirectional)
+    elif backbone_type == 'transformer':
+        nhead = configs['backbone'].get('nhead', 8)
+        num_layers = configs['backbone']['num_layers']
+        dim_feedforward = configs['backbone'].get('dim_feedforward', 2048)
+        dropout = configs['backbone'].get('dropout', 0.1)
+        activation = configs['backbone'].get('activation', 'relu')
+        max_cache_len = configs['backbone'].get('max_cache_len', 1000)
+        backbone = StreamingTransformer(
+            d_model=hidden_dim,
+            nhead=nhead,
+            num_layers=num_layers,
+            dim_feedforward=dim_feedforward,
+            dropout=dropout,
+            activation=activation,
+            max_cache_len=max_cache_len
+        )
     elif backbone_type == 'tcn':
         # Depthwise Separable
         num_layers = configs['backbone']['num_layers']

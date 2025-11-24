@@ -1,0 +1,121 @@
+# 帧流式关键词检测训练配置文件
+# Frame Streaming Keyword Spotting Training Configuration
+#
+# 此配置适用于帧流式KWS模型训练
+# 模型支持逐帧处理，适合实时流式推理场景
+
+dataset_conf:
+    # 数据过滤配置
+    filter_conf:
+        max_length: 2048      # 最大序列长度（帧数）
+        min_length: 0        # 最小序列长度（帧数）
+        token_max_length: 200 # 最大token长度
+        token_min_length: 1   # 最小token长度
+        max_output_input_ratio: 1
+        min_output_input_ratio: 0.0005
+    
+    # 重采样配置
+    resample_conf:
+        resample_rate: 16000  # 采样率，必须为16kHz（与推理一致）
+    
+    # 速度扰动（数据增强）
+    speed_perturb: false      # 帧流式训练建议关闭，保持时间对齐
+    
+    # 特征提取配置
+    feats_type: 'fbank'       # 使用fbank特征（与推理一致）
+    feature_extraction_conf:
+        feature_type: 'fbank'
+        num_mel_bins: 80      # Mel滤波器数量
+        frame_shift: 10       # 帧移（毫秒），10ms对应160个样本
+        frame_length: 25      # 帧长（毫秒），25ms对应400个样本
+        dither: 1.0           # 抖动，用于数据增强
+    
+    # 上下文扩展（重要：帧流式推理需要）
+    context_expansion: true
+    context_expansion_conf:
+        left: 2               # 左侧上下文帧数
+        right: 2              # 右侧上下文帧数
+        # 注意：这些值需要与推理时的配置一致
+    
+    # 帧跳跃（下采样）
+    frame_skip: 3             # 每3帧取1帧，降低计算量
+    # 注意：frame_skip会影响帧流式推理的时序，需要保持一致
+    
+    # 频谱增强（数据增强）
+    spec_aug: true
+    spec_aug_conf:
+        num_t_mask: 1         # 时间掩码数量
+        num_f_mask: 1         # 频率掩码数量
+        max_t: 20             # 最大时间掩码长度（帧）
+        max_f: 10             # 最大频率掩码长度（频带）
+    
+    # 数据打乱
+    shuffle: true
+    shuffle_conf:
+        shuffle_size: 1500    # 打乱缓冲区大小
+    
+    # 批处理配置
+    batch_conf:
+        batch_size: 256       # 批次大小，根据GPU内存调整
+
+# 模型配置
+model:
+    input_dim: 400            # 输入维度 = num_mel_bins * (left + 1 + right)
+                              # 如果context_expansion: 80 * (2 + 1 + 2) = 400
+                              # 如果无context_expansion: 80
+    hidden_dim: 128           # 隐藏层维度
+    
+    # 预处理层
+    preprocessing:
+        type: none            # 无预处理（或使用 'linear' 进行维度投影）
+        # 如果使用linear:
+        # type: linear
+        # input_dim: 400
+        # output_dim: 128
+    
+    # 骨干网络（FSMN - Feedforward Sequential Memory Network）
+    backbone:
+        type: fsmn            # 使用FSMN作为backbone（支持流式推理）
+        input_affine_dim: 140  # 输入仿射层维度
+        num_layers: 4          # FSMN层数
+        linear_dim: 250        # 线性层维度
+        proj_dim: 128          # 投影维度
+        left_order: 10         # 左侧记忆阶数
+        right_order: 2         # 右侧记忆阶数
+        left_stride: 1         # 左侧步长
+        right_stride: 1        # 右侧步长
+        output_affine_dim: 140 # 输出仿射层维度
+    
+    # 分类器
+    classifier:
+        type: identity         # 恒等映射（用于CTC loss）
+        # 对于CTC，不需要额外的分类器
+        # 对于其他loss，可以使用：
+        # type: global  # 全局平均池化
+        # type: last    # 使用最后一帧
+        # dropout: 0.1
+    
+    # 激活函数
+    activation:
+        type: identity         # 恒等激活（用于CTC loss）
+        # CTC loss需要原始logits，不使用激活函数
+
+# 优化器配置
+optim: adam
+optim_conf:
+    lr: 0.001                 # 初始学习率
+    weight_decay: 0.0001      # 权重衰减（L2正则化）
+
+# 训练配置
+training_config:
+    grad_clip: 5              # 梯度裁剪阈值
+    max_epoch: 80             # 最大训练轮数
+    log_interval: 10           # 日志打印间隔（batch数）
+    criterion: ctc            # 损失函数类型：ctc（用于CTC解码）
+                              # 其他选项：max_pooling, ce (cross entropy)
+
+# 可选配置（通过命令行参数传入）
+# cmvn: 全局CMVN（Cepstral Mean and Variance Normalization）
+#   norm_var: true/false      # 是否归一化方差
+#   cmvn_file: path/to/cmvn   # CMVN统计文件路径
+
