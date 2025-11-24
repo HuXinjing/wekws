@@ -17,6 +17,13 @@ dataset_conf:
     
     # Fbank特征提取
     feats_type: 'fbank'
+    # fbank_conf 用于 compute_cmvn_stats.py
+    fbank_conf:
+        num_mel_bins: 40          # hi_xiaowen 使用 40 维
+        frame_shift: 10            # 10ms帧移
+        frame_length: 25           # 25ms帧长
+        dither: 1.0
+    # feature_extraction_conf 用于训练脚本
     feature_extraction_conf:
         feature_type: 'fbank'
         num_mel_bins: 40          # hi_xiaowen 使用 40 维

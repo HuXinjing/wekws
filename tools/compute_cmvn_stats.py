@@ -31,7 +31,7 @@ class CollateFunc(object):
             value = item[1].strip().split(",")
             assert len(value) == 3 or len(value) == 1
             wav_path = value[0]
-            sample_rate = torchaudio.info(wav_path, backend='sox').sample_rate
+            sample_rate = torchaudio.info(wav_path, backend='soundfile').sample_rate
             resample_rate = sample_rate
             # len(value) == 3 means segmented wav.scp,
             # len(value) == 1 means original wav.scp
@@ -42,7 +42,7 @@ class CollateFunc(object):
                     filepath=wav_path,
                     num_frames=end_frame - start_frame,
                     frame_offset=start_frame,
-                    backend='sox')
+                    backend='soundfile')
             else:
                 waveform, sample_rate = torchaudio.load(item[1])
 
