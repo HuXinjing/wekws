@@ -1,0 +1,85 @@
+# 帧流式训练配置 - 基于 hi_xiaowen 的 TCN CTC 配置
+# Frame Streaming Training Config - Based on hi_xiaowen TCN CTC
+
+dataset_conf:
+    filter_conf:
+        max_length: 2048
+        min_length: 0
+        token_max_length: 200
+        token_min_length: 1
+        max_output_input_ratio: 1
+        min_output_input_ratio: 0.0005
+    
+    resample_conf:
+        resample_rate: 16000
+    
+    speed_perturb: false
+    
+    # Fbank特征提取
+    feats_type: 'fbank'
+    feature_extraction_conf:
+        feature_type: 'fbank'
+        num_mel_bins: 40          # hi_xiaowen 使用 40 维
+        frame_shift: 10            # 10ms帧移
+        frame_length: 25           # 25ms帧长
+        dither: 1.0
+    
+    # 上下文扩展（帧流式训练可选，但建议使用以提升性能）
+    context_expansion: true
+    context_expansion_conf:
+        left: 2                    # 左侧上下文帧数
+        right: 2                   # 右侧上下文帧数
+    
+    # 帧下采样（可选，用于减少计算量）
+    frame_skip: 1                  # 1表示不跳过，3表示每3帧取1帧
+    
+    # 数据增强
+    spec_aug: true
+    spec_aug_conf:
+        num_t_mask: 1
+        num_f_mask: 1
+        max_t: 20
+        max_f: 10
+    
+    shuffle: true
+    shuffle_conf:
+        shuffle_size: 1500
+    
+    sort: false
+    batch_conf:
+        batch_size: 256            # 可根据GPU内存调整
+
+model:
+    # 输入维度计算：
+    # 如果有 context_expansion: input_dim = num_mel_bins * (left + 1 + right) = 40 * 5 = 200
+    # 如果无 context_expansion: input_dim = num_mel_bins = 40
+    input_dim: 200                # 40 * (2 + 1 + 2) = 200 (需要与 dataset_conf 中的 context_expansion 配置匹配)
+    hidden_dim: 256
+    
+    preprocessing:
+        type: linear               # 线性投影
+    
+    backbone:
+        type: tcn                 # 使用 TCN backbone
+        ds: true                  # 使用深度可分离卷积
+        num_layers: 4
+        kernel_size: 8
+        dropout: 0.1
+    
+    classifier:
+        type: identity            # CTC 使用 identity
+    
+    activation:
+        type: identity            # CTC 使用 identity
+
+optim: adam
+optim_conf:
+    lr: 0.001
+    weight_decay: 0.0001
+
+training_config:
+    grad_clip: 5
+    max_epoch: 80
+    log_interval: 10
+    criterion: ctc
+
