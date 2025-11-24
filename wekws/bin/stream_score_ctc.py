@@ -130,7 +130,12 @@ def main():
     args = get_args()
     logging.basicConfig(level=logging.DEBUG,
                         format='%(asctime)s %(levelname)s %(message)s')
-    torch.cuda.set_device(args.gpu)
+    # Check if CUDA is available before setting device
+    if args.gpu >= 0 and torch.cuda.is_available():
+        torch.cuda.set_device(args.gpu)
+    elif args.gpu >= 0:
+        logging.warning(f'GPU {args.gpu} requested but CUDA is not available. Using CPU instead.')
+        args.gpu = -1
 
     with open(args.config, 'r') as fin:
         configs = yaml.load(fin, Loader=yaml.FullLoader)

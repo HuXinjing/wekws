@@ -46,27 +46,43 @@ def main():
             with open(y, 'r') as f:
                 dic_yaml = yaml.load(f, Loader=yaml.FullLoader)
                 print(y, dic_yaml)
-                loss = dic_yaml['cv_loss']
-                epoch = dic_yaml['epoch']
-                if epoch >= args.min_epoch and epoch <= args.max_epoch:
-                    val_scores += [[epoch, loss]]
-        val_scores = np.array(val_scores)
-        sort_idx = np.argsort(val_scores[:, -1])
-        sorted_val_scores = val_scores[sort_idx][::1]
-        print("best val scores = " + str(sorted_val_scores[:args.num, 1]))
-        print("selected epochs = " +
-              str(sorted_val_scores[:args.num, 0].astype(np.int64)))
-        path_list = [
-            args.src_path + '/{}.pt'.format(int(epoch))
-            for epoch in sorted_val_scores[:args.num, 0]
-        ]
-    else:
-        path_list = glob.glob('{}/[!avg][!final]*.pt'.format(args.src_path))
+                if 'cv_loss' in dic_yaml and 'epoch' in dic_yaml:
+                    loss = dic_yaml['cv_loss']
+                    epoch = dic_yaml['epoch']
+                    if epoch >= args.min_epoch and epoch <= args.max_epoch:
+                        val_scores += [[epoch, loss]]
+        if len(val_scores) == 0:
+            print("Warning: No validation scores found. Using latest checkpoints instead.")
+            args.val_best = False
+        else:
+            val_scores = np.array(val_scores)
+            if val_scores.ndim == 1:
+                # Handle case where only one score is found
+                val_scores = val_scores.reshape(1, -1)
+            sort_idx = np.argsort(val_scores[:, -1])
+            sorted_val_scores = val_scores[sort_idx][::1]
+            print("best val scores = " + str(sorted_val_scores[:args.num, 1]))
+            print("selected epochs = " +
+                  str(sorted_val_scores[:args.num, 0].astype(np.int64)))
+            path_list = [
+                args.src_path + '/{}.pt'.format(int(epoch))
+                for epoch in sorted_val_scores[:args.num, 0]
+            ]
+    if not args.val_best:
+        path_list = glob.glob('{}/[!avg][!final][!test]*.pt'.format(args.src_path))
+        # Filter out test files and other non-checkpoint files
+        path_list = [p for p in path_list if os.path.basename(p).replace('.pt', '').isdigit()]
         path_list = sorted(path_list, key=os.path.getmtime)
         path_list = path_list[-args.num:]
     print(path_list)
     avg = None
     num = args.num
+    if len(path_list) == 0:
+        print(f"Error: No checkpoint files found in {args.src_path}")
+        return
+    if num > len(path_list):
+        print(f"Warning: Requested {num} checkpoints but only {len(path_list)} found. Using {len(path_list)} checkpoints.")
+        num = len(path_list)
     assert num == len(path_list)
     for path in path_list:
         print('Processing {}'.format(path))

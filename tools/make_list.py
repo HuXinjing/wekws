@@ -73,3 +73,82 @@ if __name__ == '__main__':
 
             json_line = json.dumps(line, ensure_ascii=False)
             fout.write(json_line + '\n')
+
+
+def read_token(token_file):
+    """Read token file and return a dictionary mapping token to index."""
+    token_table = {}
+    with open(token_file, 'r', encoding='utf8') as f:
+        for line in f:
+            arr = line.strip().split()
+            if len(arr) >= 2:
+                token = arr[0]
+                idx = int(arr[1])
+                token_table[token] = idx
+    return token_table
+
+
+def read_lexicon(lexicon_file):
+    """Read lexicon file and return a dictionary mapping word to token list."""
+    lexicon_table = {}
+    with open(lexicon_file, 'r', encoding='utf8') as f:
+        for line in f:
+            arr = line.strip().split()
+            if len(arr) >= 2:
+                word = arr[0]
+                tokens = arr[1:]
+                lexicon_table[word] = tokens
+    return lexicon_table
+
+
+def query_token_set(keyword, token_table, lexicon_table):
+    """
+    Query token set for a keyword.
+    
+    Args:
+        keyword: The keyword string
+        token_table: Dictionary mapping token to index
+        lexicon_table: Dictionary mapping word to token list
+    
+    Returns:
+        strs: List of token strings
+        indexes: List of token indices
+    """
+    strs = []
+    indexes = []
+    
+    # Split keyword into characters/words
+    # For Chinese, each character is a word
+    # For English, split by space or use each character
+    if ' ' in keyword:
+        words = keyword.split()
+    else:
+        # For Chinese or single word, treat each character as a word
+        words = list(keyword)
+    
+    for word in words:
+        if word in lexicon_table:
+            # Word found in lexicon
+            tokens = lexicon_table[word]
+            for token in tokens:
+                if token in token_table:
+                    strs.append(token)
+                    indexes.append(token_table[token])
+        elif word in token_table:
+            # Word is directly a token
+            strs.append(word)
+            indexes.append(token_table[word])
+        else:
+            # Try to find character by character
+            for char in word:
+                if char in token_table:
+                    strs.append(char)
+                    indexes.append(token_table[char])
+                elif char in lexicon_table:
+                    tokens = lexicon_table[char]
+                    for token in tokens:
+                        if token in token_table:
+                            strs.append(token)
+                            indexes.append(token_table[token])
+    
+    return strs, indexes

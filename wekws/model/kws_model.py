@@ -203,23 +203,25 @@ def init_model(configs):
         # For speech command dataset, we use 2 FC layer as classifier,
         # we add dropout after first FC layer to prevent overfitting
         classifier_type = configs['classifier']['type']
-        dropout = configs['classifier']['dropout']
-
-        classifier_base = nn.Sequential(nn.Linear(hidden_dim, 64), nn.ReLU(),
-                                        nn.Dropout(dropout),
-                                        nn.Linear(64, output_dim))
-        if classifier_type == 'global':
-            # global means we add a global average pooling before classifier
-            classifier = GlobalClassifier(classifier_base)
-        elif classifier_type == 'last':
-            # last means we use last frame to do backpropagation, so the model
-            # can be infered streamingly
-            classifier = LastClassifier(classifier_base)
-        elif classifier_type == 'identity':
+        
+        if classifier_type == 'identity':
             classifier = nn.Identity()
         else:
-            print('Unknown classifier type {}'.format(classifier_type))
-            sys.exit(1)
+            # For non-identity classifiers, dropout is required
+            dropout = configs['classifier'].get('dropout', 0.1)
+            classifier_base = nn.Sequential(nn.Linear(hidden_dim, 64), nn.ReLU(),
+                                            nn.Dropout(dropout),
+                                            nn.Linear(64, output_dim))
+            if classifier_type == 'global':
+                # global means we add a global average pooling before classifier
+                classifier = GlobalClassifier(classifier_base)
+            elif classifier_type == 'last':
+                # last means we use last frame to do backpropagation, so the model
+                # can be infered streamingly
+                classifier = LastClassifier(classifier_base)
+            else:
+                print('Unknown classifier type {}'.format(classifier_type))
+                sys.exit(1)
         activation = nn.Identity()
     else:
         classifier = LinearClassifier(hidden_dim, output_dim)

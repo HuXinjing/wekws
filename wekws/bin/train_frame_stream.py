@@ -32,6 +32,7 @@ from wekws.utils.checkpoint import load_checkpoint, save_checkpoint
 from wekws.model.kws_model import init_model
 from wekws.utils.executor import Executor
 from wekws.utils.train_utils import count_parameters, set_mannul_seed
+from wekws.utils.gpu_utils import setup_gpu, diagnose_gpu
 from wekws.model.loss import criterion
 from wenet.text.char_tokenizer import CharTokenizer
 
@@ -291,8 +292,13 @@ def main():
     rank = int(os.environ.get('LOCAL_RANK', 0))
     world_size = int(os.environ.get('WORLD_SIZE', 1))
     gpu = int(args.gpus.split(',')[rank]) if args.gpus != '-1' else -1
-    if gpu >= 0:
-        torch.cuda.set_device(gpu)
+    
+    # Setup GPU with proper diagnostics
+    if rank == 0 and gpu >= 0:
+        # Print GPU diagnostic info on first rank
+        diagnose_gpu()
+    
+    device, gpu = setup_gpu(gpu)
     if world_size > 1:
         logging.info('training on multiple gpus, this gpu {}'.format(gpu))
         dist.init_process_group(backend=args.dist_backend)
@@ -382,16 +388,20 @@ def main():
         os.makedirs(model_dir, exist_ok=True)
         exp_id = os.path.basename(model_dir)
         writer = SummaryWriter(os.path.join(args.tensorboard_dir, exp_id))
+        # Save config file
+        config_path = os.path.join(model_dir, 'config.yaml')
+        with open(config_path, 'w') as f:
+            yaml.dump(configs, f, default_flow_style=False, allow_unicode=True)
 
     if world_size > 1:
-        assert (torch.cuda.is_available())
+        if not torch.cuda.is_available():
+            raise RuntimeError("Distributed training requires GPU but GPU is not available")
         # cuda model is required for nn.parallel.DistributedDataParallel
         model.cuda()
         model = torch.nn.parallel.DistributedDataParallel(model)
         device = torch.device("cuda")
     else:
-        use_cuda = gpu >= 0 and torch.cuda.is_available()
-        device = torch.device('cuda' if use_cuda else 'cpu')
+        # device is already set by setup_gpu
         model = model.to(device)
 
     optimizer = optim.Adam(model.parameters(), **configs['optim_conf'])

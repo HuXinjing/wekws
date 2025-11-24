@@ -1,4 +1,5 @@
 #!/bin/bash
+
 # Copyright 2021  Binbin Zhang(binbzha@qq.com)
 #           2023  Jing Du(thuduj12@163.com)
 #
@@ -15,7 +16,18 @@ num_keywords=2599
 config=conf/frame_stream_tcn_ctc.yaml
 norm_mean=true
 norm_var=true
-gpus="0"
+
+# GPU设置
+# 对于 NVIDIA GPU (CUDA): 使用 "0", "1" 等
+# 对于 AMD GPU (ROCm): 使用 "0", "1" 等（需要先配置ROCm环境）
+# 如果没有GPU或想使用CPU: 使用 "-1"
+# 注意：Ubuntu 24.04 上 ROCm 5.7 不支持，建议先用 CPU
+gpus="-1"  # 使用 CPU（如果配置好 ROCm 可以改为 "0"）
+
+# ROCm环境变量（如果需要，取消注释并设置正确的路径）
+# export ROCM_PATH=/opt/rocm
+# export HIP_PLATFORM=amd
+# export HSA_OVERRIDE_GFX_VERSION=10.3.0  # 根据你的GPU型号调整
 
 checkpoint=
 dir=exp/frame_stream_tcn_ctc
@@ -99,6 +111,13 @@ fi
 # 帧流式训练阶段
 if [ ${stage} -le 2 ] && [ ${stop_stage} -ge 2 ]; then
   echo "Start frame streaming training ..."
+  
+  # 检查GPU可用性（如果是ROCm）
+  if [ "$gpus" != "-1" ]; then
+    echo "Checking GPU availability..."
+    python -c "import torch; print('GPU available:', torch.cuda.is_available()); print('GPU count:', torch.cuda.device_count() if torch.cuda.is_available() else 0)" || true
+  fi
+  
   mkdir -p $dir
   cmvn_opts=
   $norm_mean && cmvn_opts="--cmvn_file data/train/global_cmvn"
@@ -170,7 +189,7 @@ if [ ${stage} -le 3 ] && [ ${stop_stage} -ge 3 ]; then
   python wekws/bin/stream_score_ctc.py \
     --config $dir/config.yaml \
     --test_data data/test/data.list \
-    --gpu 0  \
+    --gpu -1  \
     --batch_size 256 \
     --checkpoint $score_checkpoint \
     --score_file $result_dir/score.txt  \
